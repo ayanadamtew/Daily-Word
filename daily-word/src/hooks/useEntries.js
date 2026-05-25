@@ -111,6 +111,14 @@ export function useEntries() {
     }
     
     console.log('createReadEntry result:', result);
+    if (result.error) {
+      console.error('Database Error details:', {
+        code: result.error.code,
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint
+      });
+    }
     setLoading(false);
     return result;
   }, [user]);
@@ -175,6 +183,14 @@ export function useEntries() {
     }
     
     console.log('createSkipEntry result:', result);
+    if (result.error) {
+      console.error('Database Error details:', {
+        code: result.error.code,
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint
+      });
+    }
     setLoading(false);
     return result;
   }, [user]);

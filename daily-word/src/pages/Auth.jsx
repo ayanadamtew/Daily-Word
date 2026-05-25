@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CrossIcon from '../components/ui/CrossIcon';
 import Button from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
+import useAppStore from '../store/appStore';
 
 export default function Auth() {
   const [mode, setMode] = useState('login');
@@ -12,6 +14,14 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const { signIn, signUp } = useAuth();
+  const { user } = useAppStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
