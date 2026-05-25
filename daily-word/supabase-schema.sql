@@ -173,3 +173,139 @@ create policy "Users can upload own recap images"
 create policy "Users can update own recap images"
   on storage.objects for update
   using (bucket_id = 'recaps' and auth.uid()::text = (storage.foldername(name))[1]);
+
+
+-- =========================================================================
+-- PRIVATE GROUPS FEATURE ADDITIONS
+-- =========================================================================
+
+-- Groups table
+create table if not exists groups (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null,
+  description text,
+  church text,
+  invite_code varchar(6) unique not null,
+  created_by uuid references profiles(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- Group memberships (Junction table)
+create table if not exists group_members (
+  id uuid default uuid_generate_v4() primary key,
+  group_id uuid references groups(id) on delete cascade not null,
+  user_id uuid references profiles(id) on delete cascade not null,
+  joined_at timestamp with time zone default timezone('utc'::text, now()),
+  unique(group_id, user_id)
+);
+
+-- Group entry reactions (Prayer hands reaction 🙏)
+create table if not exists group_reactions (
+  id uuid default uuid_generate_v4() primary key,
+  entry_id uuid references entries(id) on delete cascade not null,
+  user_id uuid references profiles(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()),
+  unique(entry_id, user_id)
+);
+
+-- Helper function to break recursion in group membership checks
+create or replace function public.is_group_member(group_id_param uuid, user_id_param uuid)
+returns boolean as $$
+begin
+  return exists (
+    select 1 from public.group_members
+    where group_id = group_id_param and user_id = user_id_param
+  );
+end;
+$$ language plpgsql security definer;
+
+-- Enable Row Level Security (RLS)
+alter table groups enable row level security;
+alter table group_members enable row level security;
+alter table group_reactions enable row level security;
+
+-- Groups Policies
+create policy "Users can view groups they are part of"
+  on groups for select
+  using (
+    auth.uid() = created_by or
+    public.is_group_member(id, auth.uid())
+  );
+
+create policy "Any authenticated user can create groups"
+  on groups for insert
+  with check (auth.uid() = created_by);
+
+create policy "Only admin can update group details"
+  on groups for update
+  using (auth.uid() = created_by);
+
+create policy "Only admin can close group"
+  on groups for delete
+  using (auth.uid() = created_by);
+
+-- Group Members Policies
+create policy "Users can view members of their groups"
+  on group_members for select
+  using (
+    public.is_group_member(group_id, auth.uid())
+  );
+
+create policy "Users can join a group"
+  on group_members for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can leave a group, or admin can remove a member"
+  on group_members for delete
+  using (
+    auth.uid() = user_id or
+    exists (
+      select 1 from groups
+      where id = group_members.group_id and created_by = auth.uid()
+    )
+  );
+
+-- Group Reactions Policies
+create policy "Group reactions viewable by group members"
+  on group_reactions for select
+  using (
+    exists (
+      select 1 from public.group_members gm
+      join entries e on e.id = group_reactions.entry_id
+      where public.is_group_member(gm.group_id, auth.uid())
+      and gm.user_id = e.user_id
+    )
+  );
+
+create policy "Users can insert reactions if in the same group as entry creator"
+  on group_reactions for insert
+  with check (
+    auth.uid() = user_id and
+    exists (
+      select 1 from entries e
+      join group_members gm_creator on gm_creator.user_id = e.user_id
+      join group_members gm_me on gm_me.group_id = gm_creator.group_id
+      where e.id = entry_id and gm_me.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can delete own reactions"
+  on group_reactions for delete
+  using (auth.uid() = user_id);
+
+-- Group Privacy Select Policy on Entries
+-- Allow select if own entry OR if the user is in a shared group with the entry owner,
+-- and the entry is logged AFTER the other user's join date.
+create policy "Users can view entries of their group members after joining date"
+  on entries for select
+  using (
+    auth.uid() = user_id or
+    exists (
+      select 1 from group_members gm_me
+      join group_members gm_other on gm_me.group_id = gm_other.group_id
+      where gm_me.user_id = auth.uid()
+      and gm_other.user_id = entries.user_id
+      and entries.date >= gm_other.joined_at::date
+    )
+  );
+

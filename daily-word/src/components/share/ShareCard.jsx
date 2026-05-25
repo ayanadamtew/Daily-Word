@@ -22,6 +22,8 @@ export default function ShareCard({ recap, userName, streak, onPublish }) {
         totalDays: recap.totalDays,
         streak: streak,
         skipDays: recap.skipDays,
+        entryMap: recap.entryMap,
+        daysInMonth: recap.daysInMonth
       });
       setBlob(imageBlob);
       setPreviewUrl(URL.createObjectURL(imageBlob));

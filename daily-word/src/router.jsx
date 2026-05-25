@@ -4,7 +4,7 @@ import Journal from './pages/Journal';
 import History from './pages/History';
 import Stats from './pages/Stats';
 import Recap from './pages/Recap';
-import Explore from './pages/Explore';
+import Groups from './pages/Groups';
 import Settings from './pages/Settings';
 import Auth from './pages/Auth';
 
@@ -21,7 +21,7 @@ export const router = createBrowserRouter([
       { path: 'history', element: <History /> },
       { path: 'stats', element: <Stats /> },
       { path: 'recap', element: <Recap /> },
-      { path: 'explore', element: <Explore /> },
+      { path: 'groups', element: <Groups /> },
       { path: 'settings', element: <Settings /> },
     ],
   },
