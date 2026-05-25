@@ -61,11 +61,10 @@ export function useAuth() {
     if (data) setProfile(data);
     return { data, error };
   };
-
   const uploadAvatar = async (file) => {
     if (!user) return { error: 'Not authenticated' };
     const ext = file.name.split('.').pop();
-    const path = `avatars/${user.id}.${ext}`;
+    const path = `${user.id}/${user.id}.${ext}`;
     const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
     if (uploadError) return { error: uploadError };
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);

@@ -58,7 +58,7 @@ export function useRecap() {
 
     let imageUrl = null;
     if (imageBlob) {
-      const path = `recaps/${user.id}/${recapData.year}-${recapData.month}.png`;
+      const path = `${user.id}/${recapData.year}-${recapData.month}.png`;
       const { error: uploadErr } = await supabase.storage.from('recaps').upload(path, imageBlob, { upsert: true, contentType: 'image/png' });
       if (!uploadErr) {
         const { data: { publicUrl } } = supabase.storage.from('recaps').getPublicUrl(path);
