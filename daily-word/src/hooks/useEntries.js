@@ -51,21 +51,21 @@ export function useEntries() {
     return data || [];
   }, [user]);
 
-  const createReadEntry = useCallback(async ({ book, chapter, verse, notes }) => {
+  const createReadEntry = useCallback(async ({ book, chapter, verse, notes, customDate }) => {
     if (!user) return { error: 'Not authenticated' };
     setLoading(true);
     
-    const todayStr = getTodayStr();
+    const dateStr = customDate || getTodayStr();
     
-    // Check if entry already exists for today
+    // Check if entry already exists for the date
     const { data: existing, error: selectError } = await supabase
       .from('entries')
       .select('id')
       .eq('user_id', user.id)
-      .eq('date', todayStr)
+      .eq('date', dateStr)
       .maybeSingle();
 
-    console.log('createReadEntry check:', { existing, selectError, todayStr, userId: user.id });
+    console.log('createReadEntry check:', { existing, selectError, dateStr, userId: user.id });
 
     if (selectError) {
       console.error('Select error in createReadEntry:', selectError);
@@ -97,7 +97,7 @@ export function useEntries() {
         .from('entries')
         .insert({
           user_id: user.id,
-          date: todayStr,
+          date: dateStr,
           type: 'read',
           book,
           chapter,
@@ -123,21 +123,21 @@ export function useEntries() {
     return result;
   }, [user]);
 
-  const createSkipEntry = useCallback(async (skipReason) => {
+  const createSkipEntry = useCallback(async (skipReason, customDate) => {
     if (!user) return { error: 'Not authenticated' };
     setLoading(true);
     
-    const todayStr = getTodayStr();
+    const dateStr = customDate || getTodayStr();
     
-    // Check if entry already exists for today
+    // Check if entry already exists for the date
     const { data: existing, error: selectError } = await supabase
       .from('entries')
       .select('id')
       .eq('user_id', user.id)
-      .eq('date', todayStr)
+      .eq('date', dateStr)
       .maybeSingle();
 
-    console.log('createSkipEntry check:', { existing, selectError, todayStr, userId: user.id });
+    console.log('createSkipEntry check:', { existing, selectError, dateStr, userId: user.id });
 
     if (selectError) {
       console.error('Select error in createSkipEntry:', selectError);
@@ -169,7 +169,7 @@ export function useEntries() {
         .from('entries')
         .insert({
           user_id: user.id,
-          date: todayStr,
+          date: dateStr,
           type: 'skip',
           book: null,
           chapter: null,
@@ -195,5 +195,43 @@ export function useEntries() {
     return result;
   }, [user]);
 
-  return { loading, fetchTodayEntry, fetchRecentEntries, fetchAllEntries, fetchEntriesForMonth, createReadEntry, createSkipEntry };
+  const fetchCatchUpDays = useCallback(async () => {
+    if (!user) return [];
+    
+    const { data: latest, error } = await supabase
+      .from('entries')
+      .select('date')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    if (error || !latest) return [];
+    
+    const latestDate = new Date(latest.date + 'T00:00:00');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    latestDate.setHours(0,0,0,0);
+    yesterday.setHours(0,0,0,0);
+    
+    if (latestDate >= yesterday) return [];
+    
+    const gapDates = [];
+    let current = new Date(latestDate);
+    current.setDate(current.getDate() + 1);
+    
+    while (current <= yesterday) {
+      gapDates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    
+    if (gapDates.length > 30) {
+      return gapDates.slice(gapDates.length - 30);
+    }
+    
+    return gapDates;
+  }, [user]);
+
+  return { loading, fetchTodayEntry, fetchRecentEntries, fetchAllEntries, fetchEntriesForMonth, createReadEntry, createSkipEntry, fetchCatchUpDays };
 }

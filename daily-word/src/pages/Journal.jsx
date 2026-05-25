@@ -3,22 +3,27 @@ import TodayCard from '../components/journal/TodayCard';
 import EntryForm from '../components/journal/EntryForm';
 import SkipForm from '../components/journal/SkipForm';
 import PastEntries from '../components/journal/PastEntries';
+import CatchUpFlow from '../components/journal/CatchUpFlow';
 import { useEntries } from '../hooks/useEntries';
 import { useStreak } from '../hooks/useStreak';
 import useAppStore from '../store/appStore';
 import { fetchVerseOfTheDay } from '../lib/bibleApi';
 
 export default function Journal() {
-  const { fetchTodayEntry, fetchRecentEntries, createReadEntry, createSkipEntry, loading } = useEntries();
+  const { fetchTodayEntry, fetchRecentEntries, createReadEntry, createSkipEntry, fetchCatchUpDays, loading } = useEntries();
   const { calculateStreaks } = useStreak();
   const { entryMode, setEntryMode, resetEntryMode, profile } = useAppStore();
   const [todayEntry, setTodayEntry] = useState(null);
   const [recentEntries, setRecentEntries] = useState([]);
   const [votd, setVotd] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
+  const [catchUpDays, setCatchUpDays] = useState([]);
 
   const loadData = async () => {
     setPageLoading(true);
+    const gapDates = await fetchCatchUpDays();
+    setCatchUpDays(gapDates);
+
     const [today, recent] = await Promise.all([
       fetchTodayEntry(),
       fetchRecentEntries(7),
@@ -58,6 +63,20 @@ export default function Journal() {
         <div className="glass rounded-2xl p-4 h-24 skeleton" />
         <div className="glass rounded-2xl p-4 h-24 skeleton" />
       </div>
+    );
+  }
+
+  // Interrupt journal flow if user needs to catch up unlogged days
+  if (catchUpDays && catchUpDays.length > 0) {
+    return (
+      <CatchUpFlow
+        gapDates={catchUpDays}
+        onSaveRead={createReadEntry}
+        onSaveSkip={createSkipEntry}
+        onComplete={async () => {
+          await loadData();
+        }}
+      />
     );
   }
 
